@@ -1,1 +1,61 @@
+---
+title: "Diabetes Health Risk Analysis"
+output: html_document
+---
 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(ROCR)
+library(corrplot)
+library(knitr)
+df <- read.csv("[https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv](https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv)")
+
+glimpse(df)
+summary(df)
+# Diabetes outcome distribution
+
+df$Outcome <- as.factor(df$Outcome)
+
+ggplot(df, aes(x = Outcome)) +
+geom_bar(fill = "steelblue") +
+labs(title = "Diabetes Outcome Distribution")
+
+# BMI vs Glucose
+
+#Correlation Heatmap
+ggplot(df, aes(x = BMI, y = Glucose, color = Outcome)) +
+geom_point(alpha = 0.6) +
+labs(title = "BMI vs Glucose")
+cor_matrix <- cor(df %>% mutate(Outcome = as.numeric(as.character(Outcome))))
+corrplot(cor_matrix, method = "color", tl.cex = 0.7)
+
+#logistic regression
+set.seed(123)
+
+train_index <- createDataPartition(df$Outcome, p = 0.8, list = FALSE)
+
+train <- df[train_index, ]
+test  <- df[-train_index, ]
+
+model <- glm(Outcome ~ ., data = train, family = "binomial")
+
+summary(model)
+
+
+#predictions + model Performance
+prob <- predict(model, test, type = "response")
+pred <- ifelse(prob > 0.5, 1, 0)
+
+conf_mat <- confusionMatrix(as.factor(pred), test$Outcome)
+conf_mat
+
+#ROC cure + AUC
+pred_obj <- prediction(prob, test$Outcome)
+perf <- performance(pred_obj, "tpr", "fpr")
+
+plot(perf, col = "blue", main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2)
+
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+auc
